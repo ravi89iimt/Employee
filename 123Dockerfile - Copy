@@ -1,0 +1,33 @@
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+USER app
+WORKDIR /app
+EXPOSE 9090
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
+WORKDIR /src
+
+
+COPY ["EmployeeProject.API/EmployeeProject.API.csproj", "EmployeeProject.API/"]
+COPY ["EmployeeProject.Services/EmployeeProject.Services.csproj", "EmployeeProject.Services/"]
+COPY ["EmployeeProject.Model/EmployeeProject.Model.csproj", "EmployeeProject.Model/"]
+
+RUN dotnet restore './EmployeeProject.API/./EmployeeProject.API.csproj'
+
+ 
+COPY . .
+
+WORKDIR "/src/EmployeeProject.API"
+RUN dotnet build "./EmployeeProject.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
+
+# Publish the app to make it ready for production
+FROM build AS publish
+ARG BUILD_CONFIGURATION=Release
+WORKDIR /src/EmployeeProject.API
+RUN dotnet publish "EmployeeProject.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+
+# Final image: using the base image to copy the published app and set entry point
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "EmployeeProject.API.dll"]
